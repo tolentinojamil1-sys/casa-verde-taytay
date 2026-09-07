@@ -1,7 +1,7 @@
 # Casa Verde Taytay — functional booking website
 
 ## Run locally
-1. Install Node.js 20+.
+1. Install Node.js 22 LTS.
 2. In this folder run `npm install`.
 3. Copy `.env.example` to `.env` and set `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and a strong `SESSION_SECRET`.
 4. Run `npm start`.
@@ -26,3 +26,6 @@ For Philippine payments, choose a payment provider that supports the methods you
 
 ## Production hosting
 Use a Node-compatible host with HTTPS and persistent storage (or move SQLite to managed PostgreSQL). Set environment variables in the host dashboard. Replace the placeholder hero image with Casa Verde's licensed property photos.
+
+## Render
+This project is configured for Node.js 22.x. The server creates its SQLite data directory automatically on startup.
