@@ -214,4 +214,10 @@ app.post('/api/webhooks/payment', async (req, res) => {
   res.json({ received: true });
 });
 
-app.listen(port, () => console.log(`Casa Verde running at http://localhost:${port}`));
+const port = process.env.PORT || 10000;
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port ${port}`);
+});
+
+server.keepAliveTimeout = 120000;
+server.headersTimeout = 120000;
