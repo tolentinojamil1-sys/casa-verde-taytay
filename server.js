@@ -214,9 +214,8 @@ app.post('/api/webhooks/payment', async (req, res) => {
   res.json({ received: true });
 });
 
-const port = process.env.PORT || 10000;
-const server = app.listen(port, '0.0.0.0', () => {
-  console.log(`Server running on port ${port}`);
+const server = app.listen(process.env.PORT || 10000, '0.0.0.0', () => {
+  console.log(`Server running on port ${process.env.PORT || 10000}`);
 });
 
 server.keepAliveTimeout = 120000;
