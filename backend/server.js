@@ -183,7 +183,7 @@ async function conflicts(a, b) {
   );
   if (booking) return true;
   if (pool) {
-    const r = await pool.query('SELECT date::text AS date FROM blocked_dates WHERE date = ANY($1::date[])', [ds]);
+    const r = await pool.query('SELECT date AS date FROM blocked_dates WHERE date = ANY($1::text[])', [ds]);
     const blocked = new Set(r.rows.map(x => x.date));
     return ds.some(x => blocked.has(x));
   }
