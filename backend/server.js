@@ -17,6 +17,7 @@ const port = Number(process.env.PORT || 3000);
 const frontendUrl = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
 const usingPostgres = Boolean(process.env.DATABASE_URL);
 const paymongoSecretKey = process.env.PAYMONGO_SECRET_KEY || '';
+console.log('PayMongo configured:', Boolean(process.env.PAYMONGO_SECRET_KEY));
 const paymongoWebhookSecret = process.env.PAYMONGO_WEBHOOK_SECRET || '';
 const paymongoMethods = (process.env.PAYMONGO_PAYMENT_METHODS || 'qrph,card,gcash,paymaya,dob,brankas')
   .split(',').map(x => x.trim()).filter(Boolean);
