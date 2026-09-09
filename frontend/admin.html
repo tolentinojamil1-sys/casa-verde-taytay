@@ -1,0 +1,18 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Casa Verde Admin</title><link rel="stylesheet" href="/styles.css"></head>
+<body><section><h2>Casa Verde Admin</h2>
+<div id="login"><p>Sign in to manage reservations.</p><input id="email" placeholder="Admin email"><input id="password" type="password" placeholder="Password"><button class="btn" onclick="login()">Sign in</button><p id="msg"></p></div>
+<div id="panel" style="display:none"><p><a class="btn" href="/">Website</a> <button class="btn" onclick="logout()">Log out</button></p><h3>Reservations</h3><div id="table"></div><h3>Block a date</h3><input id="date" type="date"><input id="reason" placeholder="Reason"><button class="btn" onclick="block()">Block date</button><h3>Settings</h3><input id="rate" type="number" placeholder="Nightly rate"><input id="max" type="number" placeholder="Max guests"><button class="btn" onclick="saveSettings()">Save settings</button></div>
+</section>
+<script src="/config.js"></script>
+<script>
+const $=x=>document.querySelector(x);const API=(window.CASA_VERDE_API_URL||'').replace(/\/$/,'');
+const api=p=>`${API}${p}`;const opts=o=>({...o,credentials:'include'});
+async function login(){try{let r=await fetch(api('/api/admin/login'),opts({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('#email').value,password:$('#password').value})}));let j=await r.json();if(r.ok){$('#login').style.display='none';$('#panel').style.display='block';load()}else $('#msg').textContent=j.error}catch(e){$('#msg').textContent='Booking service may be waking up. Try again in a moment.'}}
+async function load(){try{let r=await fetch(api('/api/admin/bookings'),opts({}));if(r.status===401)return;let a=await r.json();$('#login').style.display='none';$('#panel').style.display='block';$('#table').innerHTML='<table>'+a.map(x=>`<tr><td>${x.id}</td><td>${x.name}</td><td>${x.check_in} → ${x.check_out}</td><td>₱${Number(x.total).toLocaleString()}</td><td>${x.status}</td><td><button onclick="statusChange('${x.id}','confirmed')">Confirm</button> <button onclick="statusChange('${x.id}','cancelled')">Cancel</button></td></tr>`).join('')+'</table>'}catch(e){}}
+async function statusChange(id,status){await fetch(api('/api/admin/booking-status'),opts({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status})}));load()}
+async function block(){await fetch(api('/api/admin/block'),opts({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:$('#date').value,reason:$('#reason').value})}));alert('Date blocked')}
+async function saveSettings(){await fetch(api('/api/admin/settings'),opts({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nightly_rate:$('#rate').value,max_guests:$('#max').value})}));alert('Saved')}
+async function logout(){await fetch(api('/api/admin/logout'),opts({method:'POST'}));location.reload()}
+load();
+</script></body></html>

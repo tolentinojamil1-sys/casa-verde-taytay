@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Casa Verde Taytay</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<nav>
+  <a href="/" class="logo"><span class="logo-icon">⌂</span><div><strong>CASA VERDE</strong><small>TAYTAY</small></div></a>
+  <div class="nav-links">
+    <a href="#stay">Stay</a><a href="#availability">Availability</a><a href="#booking">Book</a><a href="#contact">Contact</a>
+  </div>
+  <a class="btn btn-nav" href="#booking">Book Now</a>
+</nav>
+
+<header>
+  <div class="hero-content">
+    <h1>CASA VERDE<br><span>TAYTAY</span></h1>
+    <p class="hero-sub">Your Private Tropical Staycation in Taytay, Rizal</p>
+    <div class="hero-stats">
+      <div><b>Up to 10</b><span>Guests</span></div>
+      <div><b>Private</b><span>Pool</span></div>
+      <div><b>₱10,000</b><span>per night</span></div>
+    </div>
+  </div>
+</header>
+
+<section id="stay" class="section">
+  <div class="section-head"><h2>Your Private Stay</h2><p class="lead">Comfortable space, private pool, and everything you need for a relaxing staycation.</p></div>
+  <div class="grid4">
+    <div><b>10</b><span>Guests</span></div>
+    <div><b>1</b><span>Bedroom</span></div>
+    <div><b>4</b><span>Beds</span></div>
+    <div><b>2</b><span>Bathrooms</span></div>
+  </div>
+  <div class="amenities">
+    <span>Private pool</span><span>Full kitchen</span><span>Wi-Fi</span><span>Parking</span><span>Smart TV</span><span>Air conditioning</span>
+  </div>
+  <div style="margin-top:40px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+    <img src="/pool-day.webp" style="width:100%;height:200px;object-fit:cover;border-radius:16px;" alt="Pool">
+    <img src="/living.webp" style="width:100%;height:200px;object-fit:cover;border-radius:16px;" alt="Living">
+    <img src="/bedroom.webp" style="width:100%;height:200px;object-fit:cover;border-radius:16px;" alt="Bedroom">
+  </div>
+</section>
+
+<section id="availability" class="section alt">
+  <div class="section-head"><h2>Availability</h2><p class="lead">Green = Available · Red = Booked/Blocked</p></div>
+  <div class="calendarCard">
+    <div class="calendarHead">
+      <button id="prev">‹</button>
+      <h3 id="month"></h3>
+      <button id="next">›</button>
+    </div>
+    <div class="week">Sun Mon Tue Wed Thu Fri Sat</div>
+    <div id="cal" class="cal"></div>
+    <div class="legend"><i></i> Available <i class="red"></i> Booked/blocked</div>
+  </div>
+</section>
+
+<section id="booking" class="section">
+  <div class="section-head"><h2>Book your stay</h2></div>
+  <div class="booking">
+    <form id="form">
+      <div class="two">
+        <label>Check-in<input id="in" type="date" required></label>
+        <label>Check-out<input id="out" type="date" required></label>
+      </div>
+      <div class="two">
+        <label>Guests<select id="guests"></select></label>
+        <label>Payment method
+          <select id="payment">
+            <option value="online">Secure Online Payment — Bank / GCash / Maya / Card</option>
+            <option value="gcash">Manual GCash</option>
+            <option value="bdo">Manual BDO Bank Transfer</option>
+          </select>
+        </label>
+      </div>
+      <div class="two">
+        <label>Full name<input id="name" required></label>
+        <label>Email<input id="email" type="email" required></label>
+      </div>
+      <label>Phone<input id="phone" required></label>
+      <div id="summary" class="summary">Select dates to see your total.</div>
+      <button class="btn btn-full" type="submit">Reserve now</button>
+      <p id="msg"></p>
+    </form>
+    <aside>
+      <h3>Secure Payment</h3>
+      <div class="pay-box secure-pay">
+        <h4>Pay online</h4>
+        <p>Choose online payment at checkout to pay securely through PayMongo. Depending on your activated channels, guests can use major Philippine banks, GCash, Maya, QR Ph, or Visa/Mastercard.</p>
+        <p class="name">Casa Verde never asks guests to type their bank password or card details directly into this website.</p>
+      </div>
+      <h3 style="margin-top:18px">Manual payment fallback</h3>
+      <div class="pay-box">
+        <h4>GCash</h4>
+        <p class="acc">0947 135 5036</p>
+        <p class="name">Jamil Andrei Tolentino</p>
+      </div>
+      <div class="pay-box">
+        <h4>BDO Bank Transfer</h4>
+        <p class="acc">0065 5030 6808</p>
+        <p class="name">Jamil Andrei Tolentino</p>
+      </div>
+      <p class="note">Manual GCash/BDO: after reserving, send payment and message proof with your Booking ID. Online payments are verified automatically once PayMongo is connected.</p>
+    </aside>
+  </div>
+</section>
+
+<section id="contact" class="section alt">
+  <div class="section-head"><h2>Contact Us</h2></div>
+  <div style="max-width:600px;margin:0 auto;text-align:center;">
+    <p style="font-size:20px;font-weight:700;margin-bottom:8px;"><a href="tel:+639063638437">+63 906 363 8437</a></p>
+    <p style="color:var(--muted);margin-bottom:20px;">Monteverde Royale Subdivision, Taytay, Rizal</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+      <a class="btn" href="https://instagram.com/casaverdetaytay" target="_blank">Instagram</a>
+      <a class="btn" href="https://www.facebook.com/profile.php?id=61583522552853" target="_blank" style="background:#1877f2;">Facebook</a>
+      <a class="btn" href="tel:+639063638437" style="background:#25d366;">Call / Viber</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand"><strong>CASA VERDE TAYTAY</strong><p>Your home away from home</p></div>
+    <div class="footer-contact">
+      <p>Contact</p>
+      <a href="tel:+639063638437">+63 906 363 8437</a><br>
+      <a href="https://instagram.com/casaverdetaytay" target="_blank">@casaverdetaytay</a>
+    </div>
+    <div class="footer-links">
+      <a href="#booking">Book Now</a>
+      <a href="/admin.html">Admin</a>
+    </div>
+  </div>
+  <div class="footer-bottom">© 2026 Casa Verde Taytay • Taytay, Rizal</div>
+</footer>
+<script src="/config.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

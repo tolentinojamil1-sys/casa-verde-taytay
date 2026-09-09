@@ -1,0 +1,16 @@
+{
+  "name": "casa-verde-taytay-api",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "better-sqlite3": "11.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "pg": "^8.13.1"
+  },
+  "engines": { "node": "22.x" }
+}
