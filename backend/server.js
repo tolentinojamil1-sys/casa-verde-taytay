@@ -649,7 +649,7 @@ async function conflicts(a, b) {
           date::text AS date
         FROM blocked_dates
         WHERE
-          date = ANY($1::date[])
+          date = ANY($1::text[])
         `,
         [ds]
       );
