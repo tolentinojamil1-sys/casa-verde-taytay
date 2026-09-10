@@ -1,6 +1,7 @@
 import express from 'express';
 import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
+import nodemailer from 'nodemailer';
 import cors from 'cors';
 import Database from 'better-sqlite3';
 import pg from 'pg';
@@ -23,6 +24,24 @@ const usingPostgres = Boolean(process.env.DATABASE_URL);
 
 const paymongoSecretKey = process.env.PAYMONGO_SECRET_KEY || '';
 const paymongoWebhookSecret = process.env.PAYMONGO_WEBHOOK_SECRET || '';
+
+const gmailUser = process.env.GMAIL_USER || '';
+const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || '';
+const bookingNotificationEmail =
+  process.env.BOOKING_NOTIFICATION_EMAIL || gmailUser;
+
+const emailConfigured =
+  Boolean(gmailUser && gmailAppPassword);
+
+const mailTransporter = emailConfigured
+  ? nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: gmailUser,
+        pass: gmailAppPassword
+      }
+    })
+  : null;
 
 const paymongoMethods = (
   process.env.PAYMONGO_PAYMENT_METHODS ||
@@ -435,6 +454,143 @@ async function settings() {
 }
 
 /* ------------------------------------------------------
+   EMAIL HELPERS
+------------------------------------------------------ */
+
+function peso(amount) {
+  return new Intl.NumberFormat(
+    'en-PH',
+    {
+      style: 'currency',
+      currency: 'PHP',
+      maximumFractionDigits: 0
+    }
+  ).format(Number(amount || 0));
+}
+
+function safeText(value) {
+  return String(value ?? '').trim();
+}
+
+async function sendPaidBookingEmails(booking) {
+  if (!mailTransporter || !emailConfigured) {
+    console.warn(
+      'Booking email not sent: Gmail is not configured.'
+    );
+    return;
+  }
+
+  const bookingId = safeText(booking.id);
+  const guestName = safeText(booking.name);
+  const guestEmail = safeText(booking.email);
+  const phone = safeText(booking.phone) || 'Not provided';
+  const checkIn = safeText(booking.check_in);
+  const checkOut = safeText(booking.check_out);
+  const guests = safeText(booking.guests);
+  const total = peso(booking.total);
+
+  const guestSubject =
+    `Booking Confirmed — Casa Verde Taytay (${bookingId})`;
+
+  const guestText =
+`Hi ${guestName},
+
+Your Casa Verde Taytay reservation is confirmed and your payment has been received.
+
+Booking ID: ${bookingId}
+Check-in: ${checkIn}
+Check-out: ${checkOut}
+Guests: ${guests}
+Total paid: ${total}
+Status: Paid
+
+Please keep your Booking ID for your records.
+
+Thank you for choosing Casa Verde Taytay.`;
+
+  const guestHtml = `
+    <div style="font-family:Arial,sans-serif;line-height:1.6;color:#222;max-width:640px;margin:auto">
+      <h2 style="margin-bottom:8px">Booking Confirmed</h2>
+      <p>Hi ${guestName},</p>
+      <p>Your <strong>Casa Verde Taytay</strong> reservation is confirmed and your payment has been received.</p>
+      <table style="border-collapse:collapse;width:100%;margin:20px 0">
+        <tr><td style="padding:8px;border-bottom:1px solid #ddd"><strong>Booking ID</strong></td><td style="padding:8px;border-bottom:1px solid #ddd">${bookingId}</td></tr>
+        <tr><td style="padding:8px;border-bottom:1px solid #ddd"><strong>Check-in</strong></td><td style="padding:8px;border-bottom:1px solid #ddd">${checkIn}</td></tr>
+        <tr><td style="padding:8px;border-bottom:1px solid #ddd"><strong>Check-out</strong></td><td style="padding:8px;border-bottom:1px solid #ddd">${checkOut}</td></tr>
+        <tr><td style="padding:8px;border-bottom:1px solid #ddd"><strong>Guests</strong></td><td style="padding:8px;border-bottom:1px solid #ddd">${guests}</td></tr>
+        <tr><td style="padding:8px;border-bottom:1px solid #ddd"><strong>Total paid</strong></td><td style="padding:8px;border-bottom:1px solid #ddd">${total}</td></tr>
+        <tr><td style="padding:8px"><strong>Status</strong></td><td style="padding:8px"><strong>Paid</strong></td></tr>
+      </table>
+      <p>Please keep your Booking ID for your records.</p>
+      <p>Thank you for choosing Casa Verde Taytay.</p>
+    </div>
+  `;
+
+  const ownerSubject =
+    `New Paid Booking — ${bookingId} — ${guestName}`;
+
+  const ownerText =
+`A new Casa Verde Taytay booking has been paid.
+
+Booking ID: ${bookingId}
+Guest: ${guestName}
+Email: ${guestEmail}
+Phone: ${phone}
+Check-in: ${checkIn}
+Check-out: ${checkOut}
+Guests: ${guests}
+Total paid: ${total}
+Status: Paid`;
+
+  const jobs = [];
+
+  if (guestEmail) {
+    jobs.push(
+      mailTransporter.sendMail({
+        from: `"Casa Verde Taytay" <${gmailUser}>`,
+        to: guestEmail,
+        subject: guestSubject,
+        text: guestText,
+        html: guestHtml
+      })
+    );
+  }
+
+  if (bookingNotificationEmail) {
+    jobs.push(
+      mailTransporter.sendMail({
+        from: `"Casa Verde Taytay Website" <${gmailUser}>`,
+        to: bookingNotificationEmail,
+        subject: ownerSubject,
+        text: ownerText
+      })
+    );
+  }
+
+  if (!jobs.length) {
+    console.warn(
+      `No email recipients for booking ${bookingId}`
+    );
+    return;
+  }
+
+  const results = await Promise.allSettled(jobs);
+
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      console.error(
+        `Booking email ${index + 1} failed for ${bookingId}:`,
+        result.reason
+      );
+    }
+  });
+
+  console.log(
+    `Booking email processing completed for ${bookingId}`
+  );
+}
+
+/* ------------------------------------------------------
    PAYMONGO CHECKOUT MANAGEMENT
 ------------------------------------------------------ */
 
@@ -747,29 +903,95 @@ app.post(
             ?.reference_number;
 
         if (ref) {
-          await run(
-            `
-            UPDATE bookings
-            SET status='paid'
-            WHERE
-              id=$1
-              AND status <> 'cancelled'
-            `,
-            [ref],
+          const updateResult =
+            await run(
+              `
+              UPDATE bookings
+              SET status='paid'
+              WHERE
+                id=$1
+                AND status NOT IN (
+                  'cancelled',
+                  'paid'
+                )
+              `,
+              [ref],
 
-            `
-            UPDATE bookings
-            SET status='paid'
-            WHERE
-              id=?
-              AND status <> 'cancelled'
-            `,
-            [ref]
-          );
+              `
+              UPDATE bookings
+              SET status='paid'
+              WHERE
+                id=?
+                AND status NOT IN (
+                  'cancelled',
+                  'paid'
+                )
+              `,
+              [ref]
+            );
 
-          console.log(
-            `Booking ${ref} marked paid`
-          );
+          const changed =
+            pool
+              ? updateResult.rowCount > 0
+              : updateResult.changes > 0;
+
+          if (changed) {
+            console.log(
+              `Booking ${ref} marked paid`
+            );
+
+            const paidBooking =
+              await one(
+                `
+                SELECT
+                  id,
+                  check_in::text AS check_in,
+                  check_out::text AS check_out,
+                  guests,
+                  name,
+                  email,
+                  phone,
+                  total,
+                  status
+                FROM bookings
+                WHERE id=$1
+                `,
+                [ref],
+
+                `
+                SELECT
+                  id,
+                  check_in,
+                  check_out,
+                  guests,
+                  name,
+                  email,
+                  phone,
+                  total,
+                  status
+                FROM bookings
+                WHERE id=?
+                `,
+                [ref]
+              );
+
+            if (paidBooking) {
+              try {
+                await sendPaidBookingEmails(
+                  paidBooking
+                );
+              } catch (emailError) {
+                console.error(
+                  `Booking email error for ${ref}:`,
+                  emailError
+                );
+              }
+            }
+          } else {
+            console.log(
+              `Booking ${ref} was already paid or cancelled; no duplicate email sent`
+            );
+          }
         }
       }
 
@@ -2035,6 +2257,11 @@ app.listen(
 
     console.log(
       `Pending reservation hold: ${HOLD_MINUTES} minutes`
+    );
+
+    console.log(
+      'Booking email configured:',
+      emailConfigured
     );
 
     if (!pool) {
