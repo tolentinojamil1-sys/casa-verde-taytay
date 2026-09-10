@@ -1,18 +1,503 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Casa Verde Admin</title><link rel="stylesheet" href="/styles.css"></head>
-<body><section><h2>Casa Verde Admin</h2>
-<div id="login"><p>Sign in to manage reservations.</p><input id="email" placeholder="Admin email"><input id="password" type="password" placeholder="Password"><button class="btn" onclick="login()">Sign in</button><p id="msg"></p></div>
-<div id="panel" style="display:none"><p><a class="btn" href="/">Website</a> <button class="btn" onclick="logout()">Log out</button></p><h3>Reservations</h3><div id="table"></div><h3>Block a date</h3><input id="date" type="date"><input id="reason" placeholder="Reason"><button class="btn" onclick="block()">Block date</button><h3>Settings</h3><input id="rate" type="number" placeholder="Nightly rate"><input id="max" type="number" placeholder="Max guests"><button class="btn" onclick="saveSettings()">Save settings</button></div>
-</section>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Casa Verde Admin</title>
+  <link rel="stylesheet" href="/styles.css">
+
+  <style>
+    body{
+      background:#f6f7f4;
+      font-family:Arial, sans-serif;
+      margin:0;
+      color:#1f2d24;
+    }
+
+    .admin-wrap{
+      max-width:1100px;
+      margin:auto;
+      padding:30px 18px;
+    }
+
+    .admin-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:15px;
+      flex-wrap:wrap;
+      margin-bottom:25px;
+    }
+
+    .admin-header h1{
+      margin:0;
+      color:#174f39;
+    }
+
+    .card{
+      background:white;
+      border-radius:16px;
+      padding:22px;
+      margin-bottom:22px;
+      box-shadow:0 4px 18px rgba(0,0,0,.08);
+    }
+
+    .btn{
+      display:inline-block;
+      background:#17583f;
+      color:white;
+      border:none;
+      border-radius:10px;
+      padding:11px 18px;
+      cursor:pointer;
+      text-decoration:none;
+      font-weight:700;
+    }
+
+    .btn:hover{
+      opacity:.9;
+    }
+
+    .btn-danger{
+      background:#b53b3b;
+    }
+
+    .btn-secondary{
+      background:#6c757d;
+    }
+
+    input{
+      width:100%;
+      box-sizing:border-box;
+      padding:12px 14px;
+      margin:7px 0;
+      border:1px solid #ccd4cf;
+      border-radius:10px;
+      font-size:15px;
+    }
+
+    .table-wrap{
+      overflow-x:auto;
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      min-width:800px;
+    }
+
+    th,td{
+      padding:12px;
+      border-bottom:1px solid #e5e9e6;
+      text-align:left;
+      vertical-align:middle;
+    }
+
+    th{
+      background:#eff4f1;
+      color:#174f39;
+    }
+
+    .status{
+      display:inline-block;
+      padding:5px 10px;
+      border-radius:999px;
+      font-size:13px;
+      font-weight:bold;
+      text-transform:capitalize;
+    }
+
+    .status-paid,
+    .status-confirmed{
+      background:#d9f1e5;
+      color:#17603d;
+    }
+
+    .status-cancelled{
+      background:#f7dddd;
+      color:#9b2929;
+    }
+
+    .status-pending{
+      background:#fff1c9;
+      color:#775600;
+    }
+
+    .actions{
+      display:flex;
+      gap:7px;
+      flex-wrap:wrap;
+    }
+
+    .small-btn{
+      border:none;
+      border-radius:8px;
+      padding:8px 12px;
+      cursor:pointer;
+      font-weight:bold;
+    }
+
+    .confirm-btn{
+      background:#1e704e;
+      color:white;
+    }
+
+    .cancel-btn{
+      background:#c94d4d;
+      color:white;
+    }
+
+    .empty{
+      color:#777;
+      padding:20px 0;
+    }
+
+    .two-col{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:20px;
+    }
+
+    #msg{
+      color:#b52f2f;
+      margin-top:10px;
+    }
+
+    @media(max-width:700px){
+      .two-col{
+        grid-template-columns:1fr;
+      }
+
+      .admin-header{
+        align-items:flex-start;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="admin-wrap">
+
+  <div class="admin-header">
+    <div>
+      <h1>Casa Verde Admin</h1>
+      <div>Reservation Management Dashboard</div>
+    </div>
+  </div>
+
+  <div id="login" class="card">
+    <h2>Admin Sign In</h2>
+    <p>Sign in to manage reservations.</p>
+
+    <input id="email" type="email" placeholder="Admin email">
+    <input id="password" type="password" placeholder="Password">
+
+    <button class="btn" onclick="login()">Sign in</button>
+    <p id="msg"></p>
+  </div>
+
+  <div id="panel" style="display:none">
+
+    <div class="admin-header">
+      <div>
+        <a class="btn" href="/">View Website</a>
+        <button class="btn btn-secondary" onclick="logout()">Log out</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Reservations</h2>
+
+      <div class="table-wrap">
+        <div id="table">Loading reservations...</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+
+      <div class="card">
+        <h2>Block a Date</h2>
+
+        <input id="date" type="date">
+        <input id="reason" placeholder="Reason, e.g. Maintenance">
+
+        <button class="btn" onclick="block()">Block Date</button>
+      </div>
+
+      <div class="card">
+        <h2>Settings</h2>
+
+        <input id="rate" type="number" placeholder="Nightly rate">
+        <input id="max" type="number" placeholder="Max guests">
+
+        <button class="btn" onclick="saveSettings()">Save Settings</button>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
 <script src="/config.js"></script>
+
 <script>
-const $=x=>document.querySelector(x);const API=(window.CASA_VERDE_API_URL||'').replace(/\/$/,'');
-const api=p=>`${API}${p}`;const opts=o=>({...o,credentials:'include'});
-async function login(){try{let r=await fetch(api('/api/admin/login'),opts({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('#email').value,password:$('#password').value})}));let j=await r.json();if(r.ok){$('#login').style.display='none';$('#panel').style.display='block';load()}else $('#msg').textContent=j.error}catch(e){$('#msg').textContent='Booking service may be waking up. Try again in a moment.'}}
-async function load(){try{let r=await fetch(api('/api/admin/bookings'),opts({}));if(r.status===401)return;let a=await r.json();$('#login').style.display='none';$('#panel').style.display='block';$('#table').innerHTML='<table>'+a.map(x=>`<tr><td>${x.id}</td><td>${x.name}</td><td>${x.check_in} → ${x.check_out}</td><td>₱${Number(x.total).toLocaleString()}</td><td>${x.status}</td><td><button onclick="statusChange('${x.id}','confirmed')">Confirm</button> <button onclick="statusChange('${x.id}','cancelled')">Cancel</button></td></tr>`).join('')+'</table>'}catch(e){}}
-async function statusChange(id,status){await fetch(api('/api/admin/booking-status'),opts({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status})}));load()}
-async function block(){await fetch(api('/api/admin/block'),opts({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:$('#date').value,reason:$('#reason').value})}));alert('Date blocked')}
-async function saveSettings(){await fetch(api('/api/admin/settings'),opts({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nightly_rate:$('#rate').value,max_guests:$('#max').value})}));alert('Saved')}
-async function logout(){await fetch(api('/api/admin/logout'),opts({method:'POST'}));location.reload()}
+const $ = x => document.querySelector(x);
+
+const API = (window.CASA_VERDE_API_URL || '').replace(/\/$/, '');
+
+const api = p => `${API}${p}`;
+
+const opts = o => ({
+  ...o,
+  credentials:'include'
+});
+
+async function login(){
+  try{
+    let r = await fetch(
+      api('/api/admin/login'),
+      opts({
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json'
+        },
+        body:JSON.stringify({
+          email:$('#email').value,
+          password:$('#password').value
+        })
+      })
+    );
+
+    let j = await r.json();
+
+    if(r.ok){
+      $('#login').style.display='none';
+      $('#panel').style.display='block';
+      load();
+    }else{
+      $('#msg').textContent = j.error || 'Login failed';
+    }
+
+  }catch(e){
+    $('#msg').textContent =
+      'Booking service may be waking up. Try again in a moment.';
+  }
+}
+
+async function load(){
+  try{
+    let r = await fetch(
+      api('/api/admin/bookings'),
+      opts({})
+    );
+
+    if(r.status === 401){
+      $('#login').style.display='block';
+      $('#panel').style.display='none';
+      return;
+    }
+
+    let bookings = await r.json();
+
+    $('#login').style.display='none';
+    $('#panel').style.display='block';
+
+    if(!bookings.length){
+      $('#table').innerHTML =
+        '<div class="empty">No reservations yet.</div>';
+      return;
+    }
+
+    $('#table').innerHTML = `
+      <table>
+
+        <thead>
+          <tr>
+            <th>Booking ID</th>
+            <th>Guest</th>
+            <th>Stay</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+
+        ${bookings.map(x => {
+
+          const status =
+            (x.status || 'pending').toLowerCase();
+
+          const confirmButton =
+            status === 'paid' ||
+            status === 'confirmed'
+            ? ''
+            : `
+              <button
+                class="small-btn confirm-btn"
+                onclick="statusChange('${x.id}','confirmed')">
+                Confirm
+              </button>
+            `;
+
+          const cancelButton =
+            status === 'cancelled'
+            ? ''
+            : `
+              <button
+                class="small-btn cancel-btn"
+                onclick="statusChange('${x.id}','cancelled')">
+                Cancel
+              </button>
+            `;
+
+          return `
+            <tr>
+
+              <td>
+                <strong>${x.id}</strong>
+              </td>
+
+              <td>
+                ${x.name || ''}
+              </td>
+
+              <td>
+                ${x.check_in}
+                <br>
+                →
+                <br>
+                ${x.check_out}
+              </td>
+
+              <td>
+                ₱${Number(x.total).toLocaleString()}
+              </td>
+
+              <td>
+                <span class="status status-${status}">
+                  ${status}
+                </span>
+              </td>
+
+              <td>
+                <div class="actions">
+                  ${confirmButton}
+                  ${cancelButton}
+                </div>
+              </td>
+
+            </tr>
+          `;
+
+        }).join('')}
+
+        </tbody>
+
+      </table>
+    `;
+
+  }catch(e){
+
+    $('#table').innerHTML =
+      '<div class="empty">Could not load reservations.</div>';
+
+  }
+}
+
+async function statusChange(id,status){
+
+  const label =
+    status === 'cancelled'
+    ? 'cancel this reservation'
+    : 'confirm this reservation';
+
+  if(!confirm(`Are you sure you want to ${label}?`)){
+    return;
+  }
+
+  await fetch(
+    api('/api/admin/booking-status'),
+    opts({
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({
+        id,
+        status
+      })
+    })
+  );
+
+  load();
+}
+
+async function block(){
+
+  const date = $('#date').value;
+
+  if(!date){
+    alert('Please select a date.');
+    return;
+  }
+
+  await fetch(
+    api('/api/admin/block'),
+    opts({
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({
+        date,
+        reason:$('#reason').value
+      })
+    })
+  );
+
+  alert('Date blocked.');
+
+  $('#date').value='';
+  $('#reason').value='';
+}
+
+async function saveSettings(){
+
+  await fetch(
+    api('/api/admin/settings'),
+    opts({
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({
+        nightly_rate:$('#rate').value,
+        max_guests:$('#max').value
+      })
+    })
+  );
+
+  alert('Settings saved.');
+}
+
+async function logout(){
+
+  await fetch(
+    api('/api/admin/logout'),
+    opts({
+      method:'POST'
+    })
+  );
+
+  location.reload();
+}
+
 load();
-</script></body></html>
+</script>
+
+</body>
+</html>
