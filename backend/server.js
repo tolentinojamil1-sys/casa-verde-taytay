@@ -1,5 +1,6 @@
 import express from 'express';
 import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
 import cors from 'cors';
 import Database from 'better-sqlite3';
 import pg from 'pg';
@@ -133,6 +134,8 @@ app.use(
 
 let pool = null;
 let sqlite = null;
+
+const PgSession = connectPgSimple(session);
 
 if (usingPostgres) {
   pool = new Pool({
@@ -802,35 +805,46 @@ app.use(
   })
 );
 
+const sessionOptions = {
+  secret:
+    process.env.SESSION_SECRET ||
+    'dev-only-change-me',
+
+  resave: false,
+  saveUninitialized: false,
+
+  cookie: {
+    httpOnly: true,
+
+    secure:
+      process.env.NODE_ENV ===
+      'production',
+
+    sameSite:
+      process.env.NODE_ENV ===
+      'production'
+        ? 'none'
+        : 'lax',
+
+    maxAge:
+      8 *
+      60 *
+      60 *
+      1000
+  }
+};
+
+if (pool) {
+  sessionOptions.store =
+    new PgSession({
+      pool,
+      tableName: 'user_sessions',
+      createTableIfMissing: true
+    });
+}
+
 app.use(
-  session({
-    secret:
-      process.env.SESSION_SECRET ||
-      'dev-only-change-me',
-
-    resave: false,
-    saveUninitialized: false,
-
-    cookie: {
-      httpOnly: true,
-
-      secure:
-        process.env.NODE_ENV ===
-        'production',
-
-      sameSite:
-        process.env.NODE_ENV ===
-        'production'
-          ? 'none'
-          : 'lax',
-
-      maxAge:
-        8 *
-        60 *
-        60 *
-        1000
-    }
-  })
+  session(sessionOptions)
 );
 
 /* ------------------------------------------------------
