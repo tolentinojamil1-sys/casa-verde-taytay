@@ -11,6 +11,10 @@ const { Pool } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const port = process.env.PORT || 3000;
+const production = process.env.NODE_ENV === 'production';
+if (production && !process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET is required in production');
+}
 
 // PostgreSQL Connection Pool (Supabase)
 const pool = new Pool({
@@ -57,7 +61,7 @@ initDb().catch(console.error);
 app.use((req, res, next) => {
   const origin = req.get('Origin');
   const publicApi = req.path.startsWith('/api/') && !req.path.startsWith('/api/admin/');
-  if (publicApi && origin === 'https://tolentinojamil1-sys.github.io') {
+  if (publicApi && ['https://tolentinojamil1-sys.github.io', 'https://casa-verde-taytay-2.onrender.com'].includes(origin)) {
     res.set('Access-Control-Allow-Origin', origin);
     res.vary('Origin');
     res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -67,12 +71,20 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use((_req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.set('X-Frame-Options', 'DENY');
+  next();
+});
+app.use(express.json({ limit: '16kb' }));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-only-change-me',
   resave: false,
   saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: 'lax' }
+  cookie: { httpOnly: true, sameSite: 'lax', secure: production, maxAge: 8 * 60 * 60 * 1000 }
 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -136,13 +148,30 @@ app.post('/api/bookings', async (req, res) => {
   if (!Number.isInteger(Number(guests)) || Number(guests) < 1 || Number(guests) > Number(s.max_guests)) {
     return res.status(400).json({ error: `Maximum guests: ${s.max_guests}.` });
   }
+
+  // Validate before iterating dates, to prevent malformed or enormous requests.
+  const dateValue = value => {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return NaN;
+    const date = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value ? date.getTime() : NaN;
+  };
+  let start, end;
+  try { start = dateValue(checkIn); end = dateValue(checkOut); } catch { return res.status(400).json({ error: 'Invalid dates.' }); }
+  const length = (end - start) / 86400000;
+  if (!Number.isInteger(length) || length < 1 || length > 60) {
+    return res.status(400).json({ error: 'Choose a stay between 1 and 60 nights.' });
+  }
+  if (![name, email, phone].every(x => typeof x === 'string' && x.length <= 160) ||
+      !['gcash', 'bdo'].includes(paymentMethod)) {
+    return res.status(400).json({ error: 'Invalid reservation details.' });
+  }
   
   const nights = datesBetween(checkIn, checkOut).length;
   if (nights < 1) return res.status(400).json({ error: 'Check-out must be after check-in.' });
   if (await conflicts(checkIn, checkOut)) return res.status(409).json({ error: 'Those dates are not available.' });
 
   const total = nights * Number(s.nightly_rate);
-  const id = 'CV-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+  const id = 'CV-' + crypto.randomBytes(16).toString('hex').toUpperCase();
 
   await pool.query(
     `INSERT INTO bookings (id, check_in, check_out, guests, name, email, phone, total, payment_method, status, created_at)
@@ -155,7 +184,7 @@ app.post('/api/bookings', async (req, res) => {
 
 app.get('/api/booking/:id', async (req, res) => {
   const b = (await pool.query(
-    'SELECT id, check_in, check_out, guests, name, email, phone, total, payment_method, status, created_at FROM bookings WHERE id = $1',
+    'SELECT id, total, status FROM bookings WHERE id = $1',
     [req.params.id]
   )).rows[0];
 
@@ -168,11 +197,29 @@ function auth(req, res, next) {
   res.status(401).json({ error: 'Admin login required.' });
 }
 
-app.post('/api/admin/login', (req, res) => {
-  if (req.body.email === process.env.ADMIN_EMAIL && req.body.password === process.env.ADMIN_PASSWORD) {
-    req.session.admin = true;
-    return res.json({ ok: true });
+const loginAttempts = new Map();
+app.post('/api/admin/login', (req, res, next) => {
+  const key = req.ip;
+  const now = Date.now();
+  if (loginAttempts.size > 10000) loginAttempts.clear();
+  let attempt = loginAttempts.get(key);
+  if (!attempt || attempt.until < now) attempt = { count: 0, until: now + 15 * 60 * 1000 };
+  if (attempt.count >= 8) return res.status(429).json({ error: 'Too many attempts. Please try again later.' });
+
+  const configured = Boolean(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD);
+  const emailMatches = configured && req.body?.email === process.env.ADMIN_EMAIL;
+  const actual = crypto.createHash('sha256').update(String(req.body?.password || '')).digest();
+  const expected = crypto.createHash('sha256').update(process.env.ADMIN_PASSWORD || '').digest();
+  if (emailMatches && crypto.timingSafeEqual(actual, expected)) {
+    loginAttempts.delete(key);
+    return req.session.regenerate(err => {
+      if (err) return next(err);
+      req.session.admin = true;
+      res.json({ ok: true });
+    });
   }
+  attempt.count++;
+  loginAttempts.set(key, attempt);
   res.status(401).json({ error: 'Invalid login.' });
 });
 
@@ -221,13 +268,9 @@ app.post('/api/admin/settings', auth, async (req, res) => {
   res.json(await getSettings());
 });
 
-app.post('/api/webhooks/payment', async (req, res) => {
-  const { bookingId, status } = req.body || {};
-  if (bookingId && ['paid', 'cancelled'].includes(status)) {
-    await pool.query('UPDATE bookings SET status = $1 WHERE id = $2', [status, bookingId]);
-  }
-  res.json({ received: true });
-});
+// Retired: this endpoint previously accepted unverified payment status changes.
+// Manual transfers are marked paid only through the authenticated admin panel.
+app.post('/api/webhooks/payment', (_req, res) => res.sendStatus(404));
 
 const server = app.listen(process.env.PORT || 10000, '0.0.0.0', () => {
   console.log(`Server running on port ${process.env.PORT || 10000}`);

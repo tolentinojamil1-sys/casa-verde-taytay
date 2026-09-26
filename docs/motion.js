@@ -19,3 +19,20 @@ if ('IntersectionObserver' in window && !window.matchMedia('(prefers-reduced-mot
   }
   document.documentElement.classList.add('motion-ready');
 }
+
+// A lightweight reading progress line follows scrolling without moving page content.
+const progress = document.createElement('div');
+progress.className = 'scroll-progress';
+progress.setAttribute('aria-hidden', 'true');
+document.body.append(progress);
+let progressFrame = 0;
+function updateProgress() {
+  progressFrame = 0;
+  const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+  progress.style.transform = `scaleX(${scrollable > 0 ? Math.min(1, Math.max(0, window.scrollY / scrollable)) : 0})`;
+}
+window.addEventListener('scroll', () => {
+  if (!progressFrame) progressFrame = requestAnimationFrame(updateProgress);
+}, { passive: true });
+window.addEventListener('resize', updateProgress);
+updateProgress();

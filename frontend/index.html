@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://casa-verde-taytay-1.onrender.com; form-action 'self'; object-src 'none'; base-uri 'self'">
   <title>Casa Verde Taytay</title>
   <link rel="stylesheet" href="/styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
@@ -79,9 +80,8 @@
         <label>Guests<select id="guests"></select></label>
         <label>Payment method
           <select id="payment">
-            <option value="online">Secure Online Payment — Bank / GCash / Maya / Card</option>
-            <option value="gcash">Manual GCash</option>
-            <option value="bdo">Manual BDO Bank Transfer</option>
+            <option value="gcash">GCash</option>
+            <option value="bdo">BDO Bank Transfer</option>
           </select>
         </label>
       </div>
@@ -95,24 +95,16 @@
       <p id="msg"></p>
     </form>
     <aside>
-      <h3>Secure Payment</h3>
-      <div class="pay-box secure-pay">
-        <h4>Pay online</h4>
-        <p>Choose online payment at checkout to pay securely through PayMongo. Depending on your activated channels, guests can use major Philippine banks, GCash, Maya, QR Ph, or Visa/Mastercard.</p>
-        <p class="name">Casa Verde never asks guests to type their bank password or card details directly into this website.</p>
-      </div>
-      <h3 style="margin-top:18px">Manual payment fallback</h3>
+      <h3>Payment Details</h3>
       <div class="pay-box">
         <h4>GCash</h4>
-        <p class="acc">0947 135 5036</p>
-        <p class="name">Jamil Andrei Tolentino</p>
+        <p class="acc">09063638437</p>
       </div>
       <div class="pay-box">
         <h4>BDO Bank Transfer</h4>
         <p class="acc">0065 5030 6808</p>
-        <p class="name">Jamil Andrei Tolentino</p>
       </div>
-      <p class="note">Manual GCash/BDO: after reserving, send payment and message proof with your Booking ID. Online payments are verified automatically once PayMongo is connected.</p>
+      <p class="note">After reserving, send your transfer with your Booking ID and contact Casa Verde to confirm payment. Do not enter bank passwords or card details on this site.</p>
     </aside>
   </div>
 </section>
@@ -142,7 +134,7 @@
     </div>
     <div class="footer-links">
       <a href="#booking">Book Now</a>
-      <a href="/admin.html">Admin</a>
+      <a href="https://casa-verde-taytay-1.onrender.com/admin.html">Admin</a>
     </div>
   </div>
   <div class="footer-bottom">© 2026 Casa Verde Taytay • Taytay, Rizal</div>

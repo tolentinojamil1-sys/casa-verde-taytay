@@ -75,3 +75,18 @@ button:disabled{opacity:.65;cursor:wait}
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto; } }
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid #b88c44; outline-offset:3px; }
+
+/* Reading progress and warmer, more responsive photo details. */
+.scroll-progress{position:fixed;top:72px;left:0;width:100%;height:3px;background:linear-gradient(90deg,#d8ae62,#257f55);transform:scaleX(0);transform-origin:left;pointer-events:none;z-index:101}
+section[id]{scroll-margin-top:76px}
+.experience-card>img{transition:transform .7s cubic-bezier(.2,.7,.2,1)}
+.section-head h2::after{content:"";display:block;width:54px;height:3px;background:#c59c57;border-radius:3px;margin:14px auto 0}
+@media (prefers-reduced-motion: no-preference){
+ .scroll-progress{transition:transform .12s linear}
+ .hero-stats>div{transition:transform .3s ease,background-color .3s ease}
+ @media (hover:hover){
+  .experience-card:hover>img{transform:scale(1.045)}
+  .hero-stats>div:hover{transform:translateY(-3px);background-color:rgba(255,255,255,.2)}
+ }
+}
+@media (prefers-reduced-motion: reduce){.experience-card>img,.scroll-progress{transition:none}}

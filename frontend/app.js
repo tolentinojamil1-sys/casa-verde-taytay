@@ -4,6 +4,11 @@ let unavailable = new Set();
 const $ = x => document.querySelector(x);
 const fmt = n => `₱${Number(n).toLocaleString()}`;
 const API = (window.CASA_VERDE_API_URL || '').replace(/\/$/, '');
+function showMessage(message, kind = '') {
+  const target = $('#msg');
+  target.textContent = message;
+  target.className = kind;
+}
 
 function api(path) { return `${API}${path}`; }
 function isoLocal(d) {
@@ -17,7 +22,7 @@ async function apiFetch(path, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 90000);
   try {
-    return await fetch(api(path), { ...options, signal: controller.signal, credentials: 'include' });
+    return await fetch(api(path), { ...options, signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
@@ -25,7 +30,7 @@ async function apiFetch(path, options = {}) {
 
 async function load() {
   if (!API || API.includes('YOUR-BACKEND-NAME')) {
-    $('#msg').innerHTML = '<span class="err">Website setup is incomplete: backend URL is not configured yet.</span>';
+    showMessage('Website setup is incomplete: backend URL is not configured yet.', 'err');
     return;
   }
 
@@ -49,7 +54,7 @@ async function load() {
     calc();
     await renderCalendar();
   } catch (e) {
-    $('#msg').innerHTML = '<span class="err">The booking service is waking up. Please wait a moment and refresh if needed.</span>';
+    showMessage('The booking service is waking up. Please wait a moment and refresh if needed.', 'err');
     // Still render an empty calendar shell so the page itself remains usable.
     renderCalendarShell();
   }
@@ -124,7 +129,7 @@ $('#form').onsubmit = async e => {
   e.preventDefault();
   const btn = e.submitter;
   if (btn) { btn.disabled = true; btn.textContent = 'Checking availability…'; }
-  $('#msg').innerHTML = '<span>Connecting to the booking service. On the free plan this can take up to about a minute after inactivity.</span>';
+  showMessage('Checking your reservation. This can take about a minute if the booking service is waking up.');
   const body = {
     checkIn: $('#in').value,
     checkOut: $('#out').value,
@@ -143,19 +148,19 @@ $('#form').onsubmit = async e => {
     const j = await r.json().catch(() => ({}));
     if (r.ok) {
       if (j.checkoutUrl) {
-        $('#msg').innerHTML = `<span class="ok">Reservation ${j.id} created! Total ${fmt(j.total)}. Opening secure payment…</span>`;
+        showMessage(`Reservation ${j.id} created! Total ${fmt(j.total)}. Opening secure payment…`, 'ok');
         window.location.href = j.checkoutUrl;
         return;
       }
-      $('#msg').innerHTML = `<span class="ok">Reservation ${j.id} created! Total ${fmt(j.total)}. ${j.message || 'Please contact Casa Verde to arrange payment.'}</span>`;
+      showMessage(`Reservation ${j.id} created! Total ${fmt(j.total)}. Please send your transfer with the Booking ID and contact Casa Verde to confirm payment.`, 'ok');
       e.target.reset();
       calc();
       await renderCalendar();
     } else {
-      $('#msg').innerHTML = `<span class="err">${j.error || 'Could not create the reservation.'}</span>`;
+      showMessage(j.error || 'Could not create the reservation.', 'err');
     }
   } catch (err) {
-    $('#msg').innerHTML = '<span class="err">The booking service did not respond in time. Please try again in a moment.</span>';
+    showMessage('The booking service did not respond in time. Please try again in a moment.', 'err');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Reserve now'; }
   }
@@ -164,11 +169,11 @@ $('#form').onsubmit = async e => {
 const paymentParams = new URLSearchParams(window.location.search);
 if (paymentParams.get('payment') === 'success') {
   const booking = paymentParams.get('booking') || '';
-  $('#msg').innerHTML = `<span class="ok">Payment submitted successfully${booking ? ` for booking <b>${booking}</b>` : ''}. We are verifying it securely; your booking will update automatically.</span>`;
+  showMessage(`Payment return received${booking ? ` for booking ${booking}` : ''}. Please contact Casa Verde to confirm your payment.`, 'ok');
   document.querySelector('#booking')?.scrollIntoView({ behavior: 'smooth' });
 } else if (paymentParams.get('payment') === 'cancelled') {
   const booking = paymentParams.get('booking') || '';
-  $('#msg').innerHTML = `<span class="err">Payment was not completed${booking ? ` for booking <b>${booking}</b>` : ''}. Your reservation remains pending; you can contact Casa Verde to arrange payment.</span>`;
+  showMessage(`Payment was not completed${booking ? ` for booking ${booking}` : ''}. Your reservation remains pending; contact Casa Verde to arrange payment.`, 'err');
   document.querySelector('#booking')?.scrollIntoView({ behavior: 'smooth' });
 }
 

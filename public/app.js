@@ -65,11 +65,13 @@ $('#form').onsubmit = async e => {
   });
   const j = await r.json();
   if (r.ok) {
-    $('#msg').innerHTML = `<span class="ok">Reservation ${j.id} created! Total ${fmt(j.total)}. Please send payment via GCash or BDO and include your booking ID with the proof.</span>`;
+    $('#msg').className = 'ok';
+    $('#msg').textContent = `Reservation ${j.id} created! Total ${fmt(j.total)}. Please send payment via GCash or BDO and include your booking ID with the proof.`;
     e.target.reset();
     calc();
   } else {
-    $('#msg').innerHTML = `<span class="err">${j.error}</span>`;
+    $('#msg').className = 'err';
+    $('#msg').textContent = j.error || 'Could not create the reservation.';
   }
 };
 
