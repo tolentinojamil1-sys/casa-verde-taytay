@@ -52,6 +52,21 @@ async function initDb() {
 
 initDb().catch(console.error);
 
+// The public site is served from GitHub Pages. Only allow its origin to call
+// the public booking API; keep the admin API on this service's own domain.
+app.use((req, res, next) => {
+  const origin = req.get('Origin');
+  const publicApi = req.path.startsWith('/api/') && !req.path.startsWith('/api/admin/');
+  if (publicApi && origin === 'https://tolentinojamil1-sys.github.io') {
+    res.set('Access-Control-Allow-Origin', origin);
+    res.vary('Origin');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 app.use(express.json());
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-only-change-me',
