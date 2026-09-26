@@ -52,3 +52,5 @@ footer{background:var(--g);color:#fff;padding:40px 6% 0}
 .day.empty{background:transparent;border-color:transparent;cursor:default}
 button:disabled{opacity:.65;cursor:wait}
 @media(max-width:480px){header{background-image:linear-gradient(90deg,rgba(5,27,20,.86),rgba(5,27,20,.48)),url('/casa-hero-ai.webp');background-position:60% center}}
+
+.reviews-panel-link{display:block;max-width:680px;text-align:center}.reviews-panel-link .reviews-score h3{font-family:'Playfair Display',Georgia,serif;color:var(--g3);font-size:28px}.reviews-panel-link .reviews-score p{margin:14px 0 22px}.reviews-panel-link .reviews-score a{display:inline-block;border-radius:10px;background:var(--g);color:#fff;padding:12px 20px;text-decoration:none}.reviews-panel-link .reviews-score a:hover{background:var(--g2)}
