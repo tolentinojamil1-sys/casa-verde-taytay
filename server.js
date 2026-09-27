@@ -1,5 +1,6 @@
 import express from 'express';
 import session from 'express-session';
+import connectPgSimple from 'connect-pg-simple';
 import pg from 'pg';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
@@ -19,8 +20,13 @@ if (production && !process.env.SESSION_SECRET) {
 // PostgreSQL Connection Pool (Supabase)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  // Supabase's CA can be supplied as a PEM string (or with escaped newlines).
+  // Preserve the existing pooler connection until its CA is configured.
+  ssl: process.env.DATABASE_SSL_CA
+    ? { ca: process.env.DATABASE_SSL_CA.replace(/\\n/g, '\n'), rejectUnauthorized: true }
+    : { rejectUnauthorized: false }
 });
+const PgSession = connectPgSimple(session);
 
 // Auto-create database tables
 async function initDb() {
@@ -81,6 +87,7 @@ app.use((_req, res, next) => {
 });
 app.use(express.json({ limit: '16kb' }));
 app.use(session({
+  store: new PgSession({ pool, tableName: 'user_sessions', createTableIfMissing: true }),
   secret: process.env.SESSION_SECRET || 'dev-only-change-me',
   resave: false,
   saveUninitialized: false,
@@ -89,6 +96,11 @@ app.use(session({
 app.use(express.static(path.join(__dirname, 'public')));
 
 function iso(d) { return new Date(d + 'T00:00:00').toISOString().slice(0, 10); }
+function dateValue(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return NaN;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value ? date.getTime() : NaN;
+}
 function datesBetween(a, b) {
   const out = [];
   let d = new Date(a + 'T00:00:00'), e = new Date(b + 'T00:00:00');
@@ -99,17 +111,17 @@ function datesBetween(a, b) {
   return out;
 }
 
-async function conflicts(a, b) {
+async function conflicts(a, b, db = pool) {
   const ds = datesBetween(a, b);
   if (!ds.length) return true;
   
-  const q = await pool.query(
+  const q = await db.query(
     "SELECT 1 FROM bookings WHERE status IN ('pending','paid','confirmed') AND check_in < $1 AND check_out > $2 LIMIT 1",
     [b, a]
   );
   if (q.rows.length > 0) return true;
 
-  const blockedRes = await pool.query('SELECT date FROM blocked_dates WHERE date = ANY($1)', [ds]);
+  const blockedRes = await db.query('SELECT date FROM blocked_dates WHERE date = ANY($1)', [ds]);
   const blocked = new Set(blockedRes.rows.map(x => x.date));
   return ds.some(x => blocked.has(x));
 }
@@ -124,6 +136,10 @@ app.get('/api/config', async (req, res) => res.json(await getSettings()));
 app.get('/api/availability', async (req, res) => {
   const from = req.query.from || iso(new Date().toISOString().slice(0, 10));
   const to = req.query.to || iso(new Date(Date.now() + 120 * 86400000).toISOString().slice(0, 10));
+  const span = (dateValue(to) - dateValue(from)) / 86400000;
+  if (!Number.isInteger(span) || span < 1 || span > 366) {
+    return res.status(400).json({ error: 'Invalid date range.' });
+  }
   
   const booked = (await pool.query(
     "SELECT check_in, check_out, status FROM bookings WHERE status IN ('pending','paid','confirmed') AND check_out > $1 AND check_in < $2",
@@ -140,44 +156,51 @@ app.get('/api/availability', async (req, res) => {
 
 app.post('/api/bookings', async (req, res) => {
   const { checkIn, checkOut, guests, name, email, phone, paymentMethod } = req.body || {};
-  const s = await getSettings();
 
   if (!checkIn || !checkOut || !name || !email || !phone) {
     return res.status(400).json({ error: 'Please complete all required fields.' });
   }
-  if (!Number.isInteger(Number(guests)) || Number(guests) < 1 || Number(guests) > Number(s.max_guests)) {
-    return res.status(400).json({ error: `Maximum guests: ${s.max_guests}.` });
-  }
-
   // Validate before iterating dates, to prevent malformed or enormous requests.
-  const dateValue = value => {
-    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return NaN;
-    const date = new Date(`${value}T00:00:00Z`);
-    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value ? date.getTime() : NaN;
-  };
   let start, end;
   try { start = dateValue(checkIn); end = dateValue(checkOut); } catch { return res.status(400).json({ error: 'Invalid dates.' }); }
   const length = (end - start) / 86400000;
   if (!Number.isInteger(length) || length < 1 || length > 60) {
     return res.status(400).json({ error: 'Choose a stay between 1 and 60 nights.' });
   }
-  if (![name, email, phone].every(x => typeof x === 'string' && x.length <= 160) ||
+  if (![name, email, phone].every(x => typeof x === 'string' && x.trim().length > 0 && x.length <= 160) ||
       !['gcash', 'bdo'].includes(paymentMethod)) {
     return res.status(400).json({ error: 'Invalid reservation details.' });
+  }
+  const s = await getSettings();
+  if (!Number.isInteger(Number(guests)) || Number(guests) < 1 || Number(guests) > Number(s.max_guests)) {
+    return res.status(400).json({ error: `Maximum guests: ${s.max_guests}.` });
   }
   
   const nights = datesBetween(checkIn, checkOut).length;
   if (nights < 1) return res.status(400).json({ error: 'Check-out must be after check-in.' });
-  if (await conflicts(checkIn, checkOut)) return res.status(409).json({ error: 'Those dates are not available.' });
-
   const total = nights * Number(s.nightly_rate);
   const id = 'CV-' + crypto.randomBytes(16).toString('hex').toUpperCase();
-
-  await pool.query(
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Serialize reservation writes across all server instances before checking dates.
+    await client.query('SELECT pg_advisory_xact_lock($1)', [42689512]);
+    if (await conflicts(checkIn, checkOut, client)) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Those dates are not available.' });
+    }
+    await client.query(
     `INSERT INTO bookings (id, check_in, check_out, guests, name, email, phone, total, payment_method, status, created_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-    [id, checkIn, checkOut, Number(guests), name, email, phone, total, paymentMethod || 'online', 'pending', new Date().toISOString()]
-  );
+    [id, checkIn, checkOut, Number(guests), name, email, phone, total, paymentMethod, 'pending', new Date().toISOString()]
+    );
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 
   res.status(201).json({ id, total, nights, status: 'pending', message: 'Reservation created. Payment is the next step.' });
 });
@@ -196,6 +219,16 @@ function auth(req, res, next) {
   if (req.session.admin) return next();
   res.status(401).json({ error: 'Admin login required.' });
 }
+
+// Admin writes are made by the dashboard on this service's own origin.
+app.use('/api/admin', (req, res, next) => {
+  if (req.method === 'GET') return next();
+  const origin = req.get('Origin');
+  if (origin !== `https://${req.get('Host')}` && !( !production && origin === `http://${req.get('Host')}`)) {
+    return res.status(403).json({ error: 'Invalid request origin.' });
+  }
+  next();
+});
 
 const loginAttempts = new Map();
 app.post('/api/admin/login', (req, res, next) => {
@@ -234,7 +267,9 @@ app.get('/api/admin/bookings', auth, async (req, res) => {
 
 app.post('/api/admin/block', auth, async (req, res) => {
   const { date, reason = 'Blocked' } = req.body || {};
-  if (!date) return res.status(400).json({ error: 'Date required' });
+  if (!Number.isFinite(dateValue(date)) || typeof reason !== 'string' || reason.length > 160) {
+    return res.status(400).json({ error: 'Invalid blocked date.' });
+  }
   await pool.query(
     'INSERT INTO blocked_dates(date, reason) VALUES($1, $2) ON CONFLICT (date) DO UPDATE SET reason = EXCLUDED.reason',
     [date, reason]
@@ -259,6 +294,10 @@ app.post('/api/admin/booking-status', auth, async (req, res) => {
 app.post('/api/admin/settings', auth, async (req, res) => {
   for (const [k, v] of Object.entries(req.body || {})) {
     if (['nightly_rate', 'max_guests'].includes(k)) {
+      const n = Number(v);
+      if (!Number.isSafeInteger(n) || n < 1 || n > (k === 'max_guests' ? 100 : 1000000)) {
+        return res.status(400).json({ error: 'Invalid setting.' });
+      }
       await pool.query(
         'INSERT INTO settings(key, value) VALUES($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
         [k, String(v)]
