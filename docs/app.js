@@ -9,7 +9,10 @@ function showMessage(message, kind = '') {
   target.textContent = message;
   target.className = kind;
 }
-
+function showProofLinks(show) {
+  const links = $('#proofLinks');
+  if (links) links.hidden = !show;
+}
 function api(path) { return `${API}${path}`; }
 function isoLocal(d) {
   const y = d.getFullYear();
@@ -17,23 +20,17 @@ function isoLocal(d) {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-
 async function apiFetch(path, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 90000);
-  try {
-    return await fetch(api(path), { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
+  try { return await fetch(api(path), { ...options, signal: controller.signal }); }
+  finally { clearTimeout(timer); }
 }
-
 async function load() {
   if (!API || API.includes('YOUR-BACKEND-NAME')) {
     showMessage('Website setup is incomplete: backend URL is not configured yet.', 'err');
     return;
   }
-
   try {
     const r = await apiFetch('/api/config');
     if (!r.ok) throw new Error('Booking service unavailable');
@@ -47,7 +44,6 @@ async function load() {
       if (i === Math.min(10, Number(cfg.max_guests))) o.selected = true;
       sel.append(o);
     }
-
     const today = isoLocal(new Date());
     $('#in').min = today;
     $('#out').min = today;
@@ -55,15 +51,13 @@ async function load() {
     await renderCalendar();
   } catch (e) {
     showMessage('The booking service is waking up. Please wait a moment and refresh if needed.', 'err');
-    // Still render an empty calendar shell so the page itself remains usable.
     renderCalendarShell();
   }
 }
-
 function calc() {
   const a = $('#in').value, b = $('#out').value;
   if (!a || !b) {
-    $('#summary').textContent = 'Select dates to see your total.';
+    $('#summary').textContent = 'Select dates to see your total balance.';
     return;
   }
   const nights = (new Date(`${b}T00:00:00`) - new Date(`${a}T00:00:00`)) / 86400000;
@@ -71,10 +65,10 @@ function calc() {
     $('#summary').textContent = 'Check-out must be after check-in.';
     return;
   }
-  const total = nights * Number(cfg.nightly_rate || 10000);
-  $('#summary').innerHTML = `<b>${nights} night${nights > 1 ? 's' : ''}</b> · ${fmt(total)} total · ${fmt(cfg.nightly_rate || 10000)}/night`;
+  const rate = Number(cfg.nightly_rate || 10000);
+  const total = nights * rate;
+  $('#summary').innerHTML = `<strong>Total Balance: ${fmt(total)} for ${nights} night${nights > 1 ? 's' : ''}</strong><br><small>${fmt(rate)} per night</small>`;
 }
-
 function renderCalendarShell() {
   const title = cur.toLocaleString('en-US', { month: 'long', year: 'numeric' });
   $('#month').textContent = title;
@@ -85,7 +79,6 @@ function renderCalendarShell() {
   for (let d = 1; d <= days; d++) cells.push(`<div class="day">${d}</div>`);
   $('#cal').innerHTML = cells.join('');
 }
-
 async function renderCalendar() {
   renderCalendarShell();
   const from = isoLocal(new Date(cur.getFullYear(), cur.getMonth(), 1));
@@ -98,38 +91,34 @@ async function renderCalendar() {
     for (const b of data.booked || []) {
       let d = new Date(`${b.check_in}T00:00:00`);
       const end = new Date(`${b.check_out}T00:00:00`);
-      while (d < end) {
-        unavailable.add(isoLocal(d));
-        d.setDate(d.getDate() + 1);
-      }
+      while (d < end) { unavailable.add(isoLocal(d)); d.setDate(d.getDate() + 1); }
     }
     for (const b of data.blocked || []) unavailable.add(b.date);
-
     [...$('#cal').querySelectorAll('.day:not(.empty)')].forEach(el => {
       const date = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(el.textContent).padStart(2,'0')}`;
       el.classList.add(unavailable.has(date) ? 'booked' : 'available');
     });
   } catch (_) {}
 }
-
 $('#prev').onclick = async () => { cur.setMonth(cur.getMonth() - 1); await renderCalendar(); };
 $('#next').onclick = async () => { cur.setMonth(cur.getMonth() + 1); await renderCalendar(); };
-
 $('#in').onchange = () => {
+  showProofLinks(false);
   if ($('#in').value) {
     const next = new Date(`${$('#in').value}T00:00:00`);
     next.setDate(next.getDate() + 1);
     $('#out').min = isoLocal(next);
+    if ($('#out').value && $('#out').value < $('#out').min) $('#out').value = '';
   }
   calc();
 };
-$('#out').onchange = calc;
-
+$('#out').onchange = () => { showProofLinks(false); calc(); };
 $('#form').onsubmit = async e => {
   e.preventDefault();
   const btn = e.submitter;
-  if (btn) { btn.disabled = true; btn.textContent = 'Checking availability…'; }
-  showMessage('Checking your reservation. This can take about a minute if the booking service is waking up.');
+  showProofLinks(false);
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  showMessage('Checking availability and sending your reservation…');
   const body = {
     checkIn: $('#in').value,
     checkOut: $('#out').value,
@@ -152,7 +141,8 @@ $('#form').onsubmit = async e => {
         window.location.href = j.checkoutUrl;
         return;
       }
-      showMessage(`Reservation ${j.id} created! Total ${fmt(j.total)}. Please send your transfer with the Booking ID and contact Casa Verde to confirm payment.`, 'ok');
+      showMessage(`Reservation details sent! Booking ID: ${j.id}. Total ${fmt(j.total)}. Please send payment proof via Viber/WhatsApp to complete your booking.`, 'ok');
+      showProofLinks(true);
       e.target.reset();
       calc();
       await renderCalendar();
@@ -165,16 +155,15 @@ $('#form').onsubmit = async e => {
     if (btn) { btn.disabled = false; btn.textContent = 'Reserve now'; }
   }
 };
-
 const paymentParams = new URLSearchParams(window.location.search);
 if (paymentParams.get('payment') === 'success') {
   const booking = paymentParams.get('booking') || '';
   showMessage(`Payment return received${booking ? ` for booking ${booking}` : ''}. Please contact Casa Verde to confirm your payment.`, 'ok');
+  showProofLinks(true);
   document.querySelector('#booking')?.scrollIntoView({ behavior: 'smooth' });
 } else if (paymentParams.get('payment') === 'cancelled') {
   const booking = paymentParams.get('booking') || '';
   showMessage(`Payment was not completed${booking ? ` for booking ${booking}` : ''}. Your reservation remains pending; contact Casa Verde to arrange payment.`, 'err');
   document.querySelector('#booking')?.scrollIntoView({ behavior: 'smooth' });
 }
-
 load();
