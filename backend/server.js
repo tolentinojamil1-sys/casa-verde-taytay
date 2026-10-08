@@ -147,6 +147,41 @@ app.use(
   })
 );
 
+// Baseline response hardening (also applies to API error responses).
+app.disable('x-powered-by');
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
+
+// Small in-memory abuse guard. For multi-instance deployment use a shared store.
+const requestWindows = new Map();
+function limitRequests(scope, max, windowMs) {
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = scope + ':' + req.ip;
+    if (requestWindows.size > 5000) {
+      for (const [k, v] of requestWindows) {
+        if (v.until <= now) requestWindows.delete(k);
+      }
+    }
+    const current = requestWindows.get(key);
+    const entry = !current || current.until <= now
+      ? { count: 0, until: now + windowMs } : current;
+    entry.count++;
+    requestWindows.set(key, entry);
+    if (entry.count > max) {
+      res.setHeader('Retry-After', String(Math.ceil((entry.until - now) / 1000)));
+      return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    next();
+  };
+}
+
 /* ------------------------------------------------------
    DATABASE
 ------------------------------------------------------ */
@@ -1371,6 +1406,7 @@ async function createPaymongoCheckout(
 
 app.post(
   '/api/bookings',
+  limitRequests('booking', 8, 60 * 60 * 1000),
 
   async (
     req,
@@ -1786,33 +1822,28 @@ function auth(
 
 app.post(
   '/api/admin/login',
-
-  (req, res) => {
-    const configured =
-      process.env.ADMIN_EMAIL &&
-      process.env.ADMIN_PASSWORD;
-
-    if (
-      configured &&
-      req.body.email ===
-        process.env.ADMIN_EMAIL &&
-      req.body.password ===
-        process.env.ADMIN_PASSWORD
-    ) {
-      req.session.admin =
-        true;
-
-      return res.json({
-        ok: true
+  limitRequests('admin-login', 6, 15 * 60 * 1000),
+  (req, res, next) => {
+    const email = req.body?.email;
+    const password = req.body?.password;
+    const expectedEmail = process.env.ADMIN_EMAIL;
+    const expectedPassword = process.env.ADMIN_PASSWORD;
+    const constantTimeEqual = (a, b) => {
+      if (typeof a !== 'string' || typeof b !== 'string') return false;
+      const ah = crypto.createHash('sha256').update(a).digest();
+      const bh = crypto.createHash('sha256').update(b).digest();
+      return crypto.timingSafeEqual(ah, bh);
+    };
+    if (expectedEmail && expectedPassword &&
+        constantTimeEqual(email, expectedEmail) &&
+        constantTimeEqual(password, expectedPassword)) {
+      return req.session.regenerate(err => {
+        if (err) return next(err);
+        req.session.admin = true;
+        req.session.save(err => err ? next(err) : res.json({ ok: true }));
       });
     }
-
-    res
-      .status(401)
-      .json({
-        error:
-          'Invalid login.'
-      });
+    return res.status(401).json({ error: 'Invalid login.' });
   }
 );
 
