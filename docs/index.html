@@ -7,7 +7,16 @@
   <title>Casa Verde Taytay</title>
   <link rel="stylesheet" href="styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-</head>
+<style>
+.experience-card img{cursor:zoom-in}
+.gallery-lightbox{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;padding:54px 55px;box-sizing:border-box}
+.gallery-lightbox[hidden]{display:none}
+.gallery-lightbox img{max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px}
+.gallery-lightbox button{position:absolute;border:0;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;width:42px;height:42px;font-size:28px;cursor:pointer}
+.gallery-close{right:16px;top:14px}.gallery-prev{left:8px;top:50%}.gallery-next{right:8px;top:50%}
+.gallery-caption{position:absolute;bottom:12px;color:#fff;text-align:center;font-size:14px}
+@media(max-width:600px){.gallery-lightbox{padding:55px 35px}.gallery-lightbox button{width:34px;height:34px;font-size:24px}}
+</style></head>
 <body>
 <nav>
   <a href="./" class="logo"><span class="logo-icon">⌂</span><div><strong>CASA VERDE</strong><small>TAYTAY</small></div></a>
@@ -22,4 +31,4 @@
 <section id="contact" class="section alt"><div class="section-head"><h2>Contact Us</h2></div><div style="max-width:600px;margin:0 auto;text-align:center;"><p style="font-size:20px;font-weight:700;margin-bottom:8px;"><a href="tel:+639063638437">+63 906 363 8437</a></p><p style="font-size:17px;font-weight:600;margin-bottom:12px;"><a href="mailto:casaverdetaytay@gmail.com">casaverdetaytay@gmail.com</a></p><p style="color:var(--muted);margin-bottom:20px;">Monteverde Royale Subdivision, Taytay, Rizal</p><div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;"><a class="btn" href="mailto:casaverdetaytay@gmail.com">Email Us</a><a class="btn" href="https://instagram.com/casaverdetaytay" target="_blank" rel="noopener noreferrer">Instagram</a><a class="btn" href="https://www.facebook.com/profile.php?id=61583522552853" target="_blank" rel="noopener noreferrer" style="background:#1877f2;">Facebook</a><a class="btn" href="tel:+639063638437">Call</a><a class="btn" href="viber://chat?number=%2B639063638437" style="background:#7360f2;">Viber</a><a class="btn" href="https://wa.me/639063638437?text=Hello%20Casa%20Verde%20Taytay!%20I%20would%20like%20to%20send%20my%20booking%20reference%20and%20payment%20proof." target="_blank" rel="noopener noreferrer" style="background:#25d366;">WhatsApp</a></div></div></section>
 <footer><div class="footer-inner"><div class="footer-brand"><strong>CASA VERDE TAYTAY</strong><p>Your home away from home</p></div><div class="footer-contact"><p>Contact</p><a href="tel:+639063638437">+63 906 363 8437</a><br><a href="mailto:casaverdetaytay@gmail.com">casaverdetaytay@gmail.com</a><br><a href="https://instagram.com/casaverdetaytay" target="_blank" rel="noopener noreferrer">@casaverdetaytay</a><br><a href="viber://chat?number=%2B639063638437">Viber</a> · <a href="https://wa.me/639063638437?text=Hello%20Casa%20Verde%20Taytay!%20I%20would%20like%20to%20send%20my%20booking%20reference%20and%20payment%20proof." target="_blank" rel="noopener noreferrer">WhatsApp</a></div><div class="footer-links"><a href="#booking">Book Now</a><a href="https://casa-verde-taytay-1.onrender.com/admin.html">Admin</a></div></div><div class="footer-bottom">© 2026 Casa Verde Taytay • Taytay, Rizal</div></footer>
 <script src="config.js"></script><script src="app.js"></script><script src="motion.js"></script><script src="theme.js?v=light-default-20261008"></script>
-</body></html>
+<div class="gallery-lightbox" id="galleryLightbox" role="dialog" aria-modal="true" aria-label="Photo gallery" hidden><button type="button" class="gallery-close" aria-label="Close gallery">×</button><button type="button" class="gallery-prev" aria-label="Previous photo">‹</button><img id="galleryFullImage" alt=""><button type="button" class="gallery-next" aria-label="Next photo">›</button><div class="gallery-caption" id="galleryCaption"></div></div><script src="gallery.js"></script></body></html>
