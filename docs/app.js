@@ -57,7 +57,7 @@ async function load() {
 function calc() {
   const a = $('#in').value, b = $('#out').value;
   if (!a || !b) {
-    $('#summary').textContent = 'Select dates to see your total balance.';
+    $('#summary').textContent = 'Select your overnight dates. We will confirm your final quote before payment.';
     return;
   }
   const nights = (new Date(`${b}T00:00:00`) - new Date(`${a}T00:00:00`)) / 86400000;
@@ -65,9 +65,7 @@ function calc() {
     $('#summary').textContent = 'Check-out must be after check-in.';
     return;
   }
-  const rate = Number(cfg.nightly_rate || 10000);
-  const total = nights * rate;
-  $('#summary').innerHTML = `<strong>Total Balance: ${fmt(total)} for ${nights} night${nights > 1 ? 's' : ''}</strong><br><small>${fmt(rate)} per night</small>`;
+  $('#summary').innerHTML = `<strong>Overnight request: ${nights} night${nights > 1 ? 's' : ''}</strong><br><small>For 10 guests: Mon–Thu ₱8,999; Fri–Sun / holidays ₱10,000. Extra guests ₱400 per head. We will confirm the final total and availability before your ₱2,000 downpayment.</small>`;
 }
 function renderCalendarShell() {
   const title = cur.toLocaleString('en-US', { month: 'long', year: 'numeric' });
@@ -137,11 +135,11 @@ $('#form').onsubmit = async e => {
     const j = await r.json().catch(() => ({}));
     if (r.ok) {
       if (j.checkoutUrl) {
-        showMessage(`Reservation ${j.id} created! Total ${fmt(j.total)}. Opening secure payment…`, 'ok');
-        window.location.href = j.checkoutUrl;
+        showMessage(`Reservation ${j.id} created! Please confirm your package and final quote with Casa Verde before payment.`, 'ok');
+        showProofLinks(true);
         return;
       }
-      showMessage(`Reservation details sent! Booking ID: ${j.id}. Total ${fmt(j.total)}. Please send payment proof via Viber/WhatsApp to complete your booking.`, 'ok');
+      showMessage(`Reservation details sent! Booking ID: ${j.id}. Please contact us via Viber/WhatsApp with this Booking ID to confirm your package and final total before sending the ₱2,000 downpayment.`, 'ok');
       showProofLinks(true);
       e.target.reset();
       calc();
