@@ -71,6 +71,11 @@ begin
    p_payment not in ('gcash','bdo') then
    raise exception 'Invalid booking details';
  end if;
+ -- Basic anti-spam guard per contact. Further IP-based CAPTCHA enforcement is needed before public launch.
+ if (select count(*) from public.cv_bookings where created_at > now()-interval '24 hours'
+       and (lower(email)=lower(trim(p_email)) or phone=trim(p_phone))) >= 3 then
+   raise exception 'Too many requests from this contact. Please contact Casa Verde directly';
+ end if;
  if exists(select 1 from public.cv_bookings where status in ('pending','confirmed') and check_in<p_out and check_out>p_in)
   or exists(select 1 from public.cv_blocks where check_in<p_out and check_out>p_in)
  then raise exception 'Selected dates are unavailable'; end if;
