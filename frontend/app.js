@@ -1,6 +1,8 @@
 let cfg = {}, cur = new Date();
 cur.setDate(1);
 let unavailable = new Set();
+let bookingReady = false;
+let reconnectTimer = null;
 const $ = x => document.querySelector(x);
 const fmt = n => `₱${Number(n).toLocaleString()}`;
 const API = (window.CASA_VERDE_API_URL || '').replace(/\/$/, '');
@@ -38,6 +40,7 @@ async function load() {
     const r = await apiFetch('/api/config');
     if (!r.ok) throw new Error('Booking service unavailable');
     cfg = await r.json();
+    if (!Number.isInteger(Number(cfg.max_guests)) || Number(cfg.max_guests) < 1) throw new Error('Invalid booking configuration');
     const sel = $('#guests');
     sel.innerHTML = '';
     for (let i = 1; i <= Number(cfg.max_guests); i++) {
@@ -51,13 +54,25 @@ async function load() {
     const today = isoLocal(new Date());
     $('#in').min = today;
     $('#out').min = today;
+    bookingReady = true;
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    showMessage('Booking service connected.', 'ok');
     calc();
     await renderCalendar();
   } catch (e) {
-    showMessage('The booking service is waking up. Please wait a moment and refresh if needed.', 'err');
-    // Still render an empty calendar shell so the page itself remains usable.
+    bookingReady = false;
+    showMessage('Booking is temporarily unavailable. Reconnecting automatically. Please do not submit a reservation until the connection is restored.', 'err');
     renderCalendarShell();
+    scheduleReconnect();
   }
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    load();
+  }, 20000);
 }
 
 function calc() {
@@ -127,6 +142,10 @@ $('#out').onchange = calc;
 
 $('#form').onsubmit = async e => {
   e.preventDefault();
+  if (!bookingReady) {
+    showMessage('The booking service is still offline. Please wait for the connection or contact Casa Verde directly.', 'err');
+    return;
+  }
   const btn = e.submitter;
   if (btn) { btn.disabled = true; btn.textContent = 'Checking availability…'; }
   showMessage('Checking your reservation. This can take about a minute if the booking service is waking up.');
