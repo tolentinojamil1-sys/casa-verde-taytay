@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const $=id=>document.getElementById(id), status=$('status');const ready=Boolean(window.CV_SUPABASE_URL&&window.CV_SUPABASE_ANON_KEY);const db=ready?createClient(window.CV_SUPABASE_URL,window.CV_SUPABASE_ANON_KEY):null;
-$('email').value='admin@casaverde.com';
+$('email').value='casaverdetaytay@gmail.com';
 function msg(t,err=false){status.textContent=t;status.className=err?'err':'ok'}
 function el(tag,text){const x=document.createElement(tag);x.textContent=text;return x}
 async function check(){if(!ready){msg('Supabase is not configured yet.',true);return}const {data:{session}}=await db.auth.getSession();if(!session){$('dashboard').classList.add('hidden');$('login').classList.remove('hidden');return}const {data,error}=await db.rpc('cv_is_admin');if(error||!data){await db.auth.signOut();msg('This account is not authorised as a Casa Verde admin.',true);return}$('login').classList.add('hidden');$('dashboard').classList.remove('hidden');await refresh()}
