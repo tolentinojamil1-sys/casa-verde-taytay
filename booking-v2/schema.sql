@@ -47,7 +47,13 @@ begin
  return query select b.check_in,b.check_out,'booking'::text
    from public.cv_bookings b where b.status in ('pending','confirmed') and b.check_in<p_to and b.check_out>p_from
  union all select x.check_in,x.check_out,'blocked'::text from public.cv_blocks x
-   where x.check_in<p_to and x.check_out>p_from;
+   where x.check_in<p_to and x.check_out>p_from
+ union all select b.check_in::date,b.check_out::date,'legacy booking'::text from public.bookings b
+   where lower(coalesce(b.status,'')) in ('pending','confirmed','paid','approved')
+   and b.check_in ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' and b.check_out ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+   and b.check_in::date<p_to and b.check_out::date>p_from
+ union all select x.date::date,x.date::date+1,'legacy blocked'::text from public.blocked_dates x
+   where x.date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' and x.date::date>=p_from and x.date::date<p_to;
 end $$;
 revoke all on function public.cv_public_calendar(date,date) from public;
 grant execute on function public.cv_public_calendar(date,date) to anon,authenticated;
@@ -78,6 +84,7 @@ begin
  end if;
  if exists(select 1 from public.cv_bookings where status in ('pending','confirmed') and check_in<p_out and check_out>p_in)
   or exists(select 1 from public.cv_blocks where check_in<p_out and check_out>p_in)
+ or public.cv_legacy_occupied(p_in,p_out)
  then raise exception 'Selected dates are unavailable'; end if;
  insert into public.cv_bookings(check_in,check_out,guests,guest_name,email,phone,payment_method)
  values(p_in,p_out,p_guests,trim(p_name),trim(p_email),trim(p_phone),p_payment) returning id into new_id;
@@ -122,7 +129,8 @@ begin
  if p_in is null or p_out is null or p_out<=p_in then raise exception 'Invalid dates'; end if;
  perform pg_advisory_xact_lock(76100423);
  if exists(select 1 from public.cv_bookings where status in ('pending','confirmed') and check_in<p_out and check_out>p_in)
- or exists(select 1 from public.cv_blocks where check_in<p_out and check_out>p_in) then raise exception 'Dates already occupied'; end if;
+ or exists(select 1 from public.cv_blocks where check_in<p_out and check_out>p_in)
+ or public.cv_legacy_occupied(p_in,p_out) then raise exception 'Dates already occupied'; end if;
  insert into public.cv_blocks(check_in,check_out,reason) values(p_in,p_out,left(coalesce(p_reason,''),200)) returning id into v_id;
  return v_id;
 end $$;
