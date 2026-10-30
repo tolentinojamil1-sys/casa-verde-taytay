@@ -114,7 +114,8 @@ begin
  if not found then raise exception 'Booking not found'; end if;
  if p_status in ('pending','confirmed') and b.status='cancelled' and
  (exists(select 1 from public.cv_bookings x where x.id<>p_id and x.status in ('pending','confirmed') and x.check_in<b.check_out and x.check_out>b.check_in)
- or exists(select 1 from public.cv_blocks x where x.check_in<b.check_out and x.check_out>b.check_in)) then
+ or exists(select 1 from public.cv_blocks x where x.check_in<b.check_out and x.check_out>b.check_in)
+ or public.cv_legacy_occupied(b.check_in,b.check_out)) then
  raise exception 'Dates already occupied'; end if;
  update public.cv_bookings set status=p_status where id=p_id;
 end $$;
