@@ -148,7 +148,7 @@ $('#form').onsubmit = async e => {
   }
   const btn = e.submitter;
   if (btn) { btn.disabled = true; btn.textContent = 'Checking availability…'; }
-  showMessage('Checking your reservation. This can take about a minute if the booking service is waking up.');
+  showMessage('Checking availability and processing your reservation…');
   const body = {
     checkIn: $('#in').value,
     checkOut: $('#out').value,
