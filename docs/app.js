@@ -48,10 +48,10 @@ async function load() {
     $('#in').min = today;
     $('#out').min = today;
     calc();
-    await renderCalendar();
+
   } catch (e) {
     showMessage('The booking service is waking up. Please wait a moment and refresh if needed.', 'err');
-    renderCalendarShell();
+
   }
 }
 function calc() {
@@ -67,39 +67,6 @@ function calc() {
   }
   $('#summary').innerHTML = `<strong>Overnight request: ${nights} night${nights > 1 ? 's' : ''}</strong><br><small>For 10 guests: Mon–Thu ₱8,999; Fri–Sun / holidays ₱10,000. Extra guests ₱400 per head. We will confirm the final total and availability before your ₱2,000 downpayment.</small>`;
 }
-function renderCalendarShell() {
-  const title = cur.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-  $('#month').textContent = title;
-  const firstDay = new Date(cur.getFullYear(), cur.getMonth(), 1).getDay();
-  const days = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
-  const cells = [];
-  for (let i = 0; i < firstDay; i++) cells.push('<div class="day empty"></div>');
-  for (let d = 1; d <= days; d++) cells.push(`<div class="day">${d}</div>`);
-  $('#cal').innerHTML = cells.join('');
-}
-async function renderCalendar() {
-  renderCalendarShell();
-  const from = isoLocal(new Date(cur.getFullYear(), cur.getMonth(), 1));
-  const to = isoLocal(new Date(cur.getFullYear(), cur.getMonth() + 1, 1));
-  try {
-    const r = await apiFetch(`/api/availability?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
-    if (!r.ok) return;
-    const data = await r.json();
-    unavailable = new Set();
-    for (const b of data.booked || []) {
-      let d = new Date(`${b.check_in}T00:00:00`);
-      const end = new Date(`${b.check_out}T00:00:00`);
-      while (d < end) { unavailable.add(isoLocal(d)); d.setDate(d.getDate() + 1); }
-    }
-    for (const b of data.blocked || []) unavailable.add(b.date);
-    [...$('#cal').querySelectorAll('.day:not(.empty)')].forEach(el => {
-      const date = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(el.textContent).padStart(2,'0')}`;
-      el.classList.add(unavailable.has(date) ? 'booked' : 'available');
-    });
-  } catch (_) {}
-}
-$('#prev').onclick = async () => { cur.setMonth(cur.getMonth() - 1); await renderCalendar(); };
-$('#next').onclick = async () => { cur.setMonth(cur.getMonth() + 1); await renderCalendar(); };
 $('#in').onchange = () => {
   showProofLinks(false);
   if ($('#in').value) {
@@ -143,7 +110,7 @@ $('#form').onsubmit = async e => {
       showProofLinks(true);
       e.target.reset();
       calc();
-      await renderCalendar();
+
     } else {
       showMessage(j.error || 'Could not create the reservation.', 'err');
     }
